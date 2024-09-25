@@ -1,7 +1,9 @@
 package todoserver
 
 import (
+	"fmt"
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,5 +35,20 @@ func (c *Config) GetConf(confPath string) error {
 		return err
 	}
 
+	// If an environment variable exists, BindAddr is set to its value
+	addr, valid := portValidation(os.Getenv("TODO_ADDR"))
+	if valid {
+		c.BindAddr = ":" + addr
+		fmt.Printf("The BindAddr is set to %s from the $TODO_ADDR\n", addr)
+	}
+
 	return err
+}
+
+// Checks the presence and validity of the address in the environment variable
+func portValidation(val string) (string, bool) {
+	if num, err := strconv.Atoi(val); err == nil && num >= 7000 && num <= 9000 {
+		return val, true
+	}
+	return "", false
 }
