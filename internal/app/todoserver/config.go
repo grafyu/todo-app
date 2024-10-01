@@ -5,20 +5,23 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/grafyu/todo-app/internal/app/store"
 	"gopkg.in/yaml.v3"
 )
 
-// Config ...
+// Config - struct for storing the TO-DO server configuration
 type Config struct {
 	BindAddr string `yaml:"bind_addr"`
 	LogLevel string `yaml:"log_level"`
+	Store    *store.Config
 }
 
-// NewConfig ...
+// NewConfig - creating configuration for run ToDo Server
 func NewConfig() *Config {
 	return &Config{
 		BindAddr: ":8080",
 		LogLevel: "debug",
+		Store:    store.NewConfig(),
 	}
 }
 
