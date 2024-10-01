@@ -65,17 +65,6 @@ func (s *APIServer) configureRouter() {
 	s.router.HandleFunc("/hello", s.handleHello())
 }
 
-// func (s *APIServer) configureStore() error {
-// 	st := store.New(s.config.Store)   // создаем новое хранилище, по config-ам
-// 	if err := st.Open(); err != nil { // открываем новое хранилище
-// 		return err
-// 	}
-
-// 	s.store = st
-
-// 	return nil
-// }
-
 func (s *APIServer) configureStore() error {
 	db, err := sql.Open("sqlite", s.config.Store)
 	if err != nil {
@@ -86,7 +75,7 @@ func (s *APIServer) configureStore() error {
 		return err
 	}
 
-	// s.store = db
+	s.store = store.New(db)
 
 	return nil
 }
