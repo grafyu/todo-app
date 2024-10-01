@@ -1,11 +1,10 @@
-package todoserver
+package apiserver
 
 import (
 	"fmt"
 	"os"
 	"strconv"
 
-	"github.com/grafyu/todo-app/internal/app/store"
 	"gopkg.in/yaml.v3"
 )
 
@@ -13,7 +12,7 @@ import (
 type Config struct {
 	BindAddr string `yaml:"bind_addr"`
 	LogLevel string `yaml:"log_level"`
-	Store    *store.Config
+	// Store    *store.Config
 }
 
 // NewConfig - creating configuration for run ToDo Server
@@ -21,7 +20,7 @@ func NewConfig() *Config {
 	return &Config{
 		BindAddr: ":8080",
 		LogLevel: "debug",
-		Store:    store.NewConfig(),
+		// Store:    store.NewConfig(),
 	}
 }
 

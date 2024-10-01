@@ -1,4 +1,4 @@
-package todoserver
+package apiserver
 
 import (
 	"fmt"

@@ -9,10 +9,12 @@ import (
 )
 
 func TestUserRepository_Create(t *testing.T) {
-	s, teardown := store.TestStore(t, databaseURL)
+	db, teardown := store.TestDB(t, databaseURL)
 	defer teardown("scheduler")
 
+	s := store.New(db)
 	tsk, err := s.Task().Create(model.TestTask(t))
 	assert.NoError(t, err)
 	assert.NotNil(t, tsk)
 }
+ 

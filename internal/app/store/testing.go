@@ -1,32 +1,35 @@
 package store
 
 import (
+	"database/sql"
 	"fmt"
 	"testing"
 )
 
-// TestStore - возвращает сконфигурированный тестовый Store,
+// TestDB - возвращает сконфигурированный тестовый Store,
 // а, также функцию, которая будет очищать заполненные
 // в процессе тестов для проведения последующих тестов
-func TestStore(t *testing.T, databaseURL string) (*Store, func(...string)) {
+func TestDB(t *testing.T, databaseURL string) (*sql.DB, func(...string)) {
 	t.Helper()
 
-	config := NewConfig()
-	config.DatabaseURL = databaseURL
-	s := New(config)
-	if err := s.Open(); err != nil {
+	db, err := sql.Open("sqlite", databaseURL)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	return s, func(tables ...string) {
+	if err := CreateTable(db, databaseURL); err != nil {
+		t.Fatal(err)
+	}
+
+	return db, func(tables ...string) {
 		if len(tables) > 0 {
 			for _, table := range tables {
-				if _, err := s.db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", table)); err != nil {
+				if _, err := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", table)); err != nil {
 					t.Fatal(err)
 				}
 
 			}
 		}
-		s.Close()
+		db.Close()
 	}
 }
