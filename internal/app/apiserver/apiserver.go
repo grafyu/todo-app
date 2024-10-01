@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/grafyu/todo-app/internal/app/store"
+	"github.com/grafyu/todo-app/internal/app/store/sqlstore"
 )
 
 var lvlVar = new(slog.LevelVar)
@@ -17,7 +17,7 @@ type APIServer struct {
 	config *Config
 	logger *slog.Logger
 	router *http.ServeMux
-	store  *store.Store
+	store  *sqlstore.Store
 }
 
 // New APIServer ...
@@ -71,11 +71,11 @@ func (s *APIServer) configureStore() error {
 		return err
 	}
 
-	if err := store.CreateTable(db, s.config.Store); err != nil {
+	if err := sqlstore.CreateTable(db, s.config.Store); err != nil {
 		return err
 	}
 
-	s.store = store.New(db)
+	s.store = sqlstore.New(db)
 
 	return nil
 }

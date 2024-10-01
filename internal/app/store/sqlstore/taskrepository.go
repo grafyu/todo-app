@@ -1,6 +1,6 @@
 // репозитории - отвечают за взаимодействие моделей с DB
 
-package store
+package sqlstore
 
 import (
 	"database/sql"
