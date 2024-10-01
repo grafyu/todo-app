@@ -13,7 +13,7 @@ func TestUserRepository_Create(t *testing.T) {
 	defer teardown("scheduler")
 
 	s := sqlstore.New(db)
-	tsk, err := s.Task().Create(model.TestTask(t))
-	assert.NoError(t, err)
+	tsk := model.TestTask(t)
+	assert.NoError(t, s.Task().Create(tsk))
 	assert.NotNil(t, tsk)
 }

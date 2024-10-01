@@ -3,6 +3,7 @@ package sqlstore
 import (
 	"database/sql"
 
+	"github.com/grafyu/todo-app/internal/app/store"
 	_ "modernc.org/sqlite"
 )
 
@@ -24,7 +25,7 @@ func New(db *sql.DB) *Store {
 
 // Task() - метод объкта типа Store для получения объекта TaskRepository
 // для работы с ним
-func (s *Store) Task() *TaskRepository {
+func (s *Store) Task() store.TaskRepository {
 	if s.taskRepository != nil {
 		return s.taskRepository
 	}
