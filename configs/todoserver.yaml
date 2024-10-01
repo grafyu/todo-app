@@ -1,5 +1,5 @@
 --- # yaml document begining
-bind_addr: :8080
+bind_addr: :7540
 log_level: debug
 
 store:

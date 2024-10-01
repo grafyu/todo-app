@@ -22,27 +22,6 @@ func New(db *sql.DB) *Store {
 	}
 }
 
-// // Open() - open DB
-// func (s *Store) Open() error {
-// 	db, err := sql.Open("sqlite", s.config.DatabaseURL)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if err := CreateTable(db, s.config.DatabaseURL); err != nil {
-// 		return err
-// 	}
-
-// 	s.db = db
-
-// 	return nil
-// }
-
-// // Close() - disconnects the application from DB with necessary actions
-// func (s *Store) Close() {
-// 	s.db.Close()
-// }
-
 // Task() - метод объкта типа Store для получения объекта TaskRepository
 // для работы с ним
 func (s *Store) Task() *TaskRepository {

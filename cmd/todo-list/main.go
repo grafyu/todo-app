@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/grafyu/todo-app/internal/app/todoserver"
+	"github.com/grafyu/todo-app/internal/app/apiserver"
 )
 
 var (
@@ -18,13 +18,13 @@ func init() {
 func main() {
 	flag.Parse()
 
-	config := todoserver.NewConfig()
+	config := apiserver.NewConfig()
 	err := config.GetConf(configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	s := todoserver.New(config)
+	s := apiserver.New(config)
 	if err := s.Start(); err != nil {
 		log.Fatal(err)
 	}

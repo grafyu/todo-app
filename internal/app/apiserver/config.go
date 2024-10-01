@@ -12,7 +12,7 @@ import (
 type Config struct {
 	BindAddr string `yaml:"bind_addr"`
 	LogLevel string `yaml:"log_level"`
-	// Store    *store.Config
+	Store    string `yaml:"database_url"`
 }
 
 // NewConfig - creating configuration for run ToDo Server
@@ -20,7 +20,7 @@ func NewConfig() *Config {
 	return &Config{
 		BindAddr: ":8080",
 		LogLevel: "debug",
-		// Store:    store.NewConfig(),
+		Store:    "scheduler",
 	}
 }
 
