@@ -66,12 +66,12 @@ func (s *APIServer) configureRouter() {
 }
 
 func (s *APIServer) configureStore() error {
-	db, err := sql.Open("sqlite", s.config.Store)
+	db, err := sql.Open("sqlite", s.config.DatabaseURL)
 	if err != nil {
 		return err
 	}
 
-	if err := sqlstore.CreateTable(db, s.config.Store); err != nil {
+	if err := sqlstore.CreateTable(db, s.config.DatabaseURL); err != nil {
 		return err
 	}
 

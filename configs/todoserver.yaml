@@ -1,6 +1,4 @@
 --- # yaml document begining
 bind_addr: :7540
 log_level: debug
-
-store:
-  database_url: scheduler.db
+database_url: scheduler.db
