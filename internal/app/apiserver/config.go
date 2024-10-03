@@ -8,24 +8,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config - struct for storing the TO-DO server configuration
+// Config - struct for storing the Server configuration
 type Config struct {
 	BindAddr    string `yaml:"bind_addr"`
 	LogLevel    string `yaml:"log_level"`
 	DatabaseURL string `yaml:"database_url"`
 }
 
-// NewConfig - creating configuration for run ToDo Server
+// NewConfig - creating configuration then run Server
 func NewConfig() *Config {
 	return &Config{
-		BindAddr: ":8080",
-		LogLevel: "debug",
+		BindAddr:    ":8080",
+		LogLevel:    "debug",
+		DatabaseURL: "scheduler.db",
 	}
 }
 
-// Записывает параметры конфигурации сервера из yaml-файла
-// в *Config struct при настройке сервера
-func (c *Config) GetConf(confPath string) error {
+// YamlToConfig - get Server settings from a yaml file
+func (c *Config) YamlToConfig(confPath string) error {
 	yamlFile, err := os.ReadFile(confPath)
 	if err != nil {
 		return err

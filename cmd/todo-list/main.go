@@ -19,13 +19,12 @@ func main() {
 	flag.Parse()
 
 	config := apiserver.NewConfig()
-	err := config.GetConf(configPath)
+	err := config.YamlToConfig(configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	s := apiserver.New(config)
-	if err := s.Start(); err != nil {
+	if err := apiserver.Start(config); err != nil {
 		log.Fatal(err)
 	}
 }

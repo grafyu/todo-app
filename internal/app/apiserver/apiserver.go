@@ -2,8 +2,7 @@ package apiserver
 
 import (
 	"database/sql"
-	"fmt"
-	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,79 +10,44 @@ import (
 	"github.com/grafyu/todo-app/internal/app/store/sqlstore"
 )
 
-var lvlVar = new(slog.LevelVar)
-
-type APIServer struct {
-	config *Config
-	logger *slog.Logger
-	router *http.ServeMux
-	store  *sqlstore.Store
-}
-
-// New APIServer ...
-func New(config *Config) *APIServer {
-	return &APIServer{
-		config: config,
-		logger: slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: lvlVar})),
-		router: http.NewServeMux(),
-	}
-}
-
-// Start HTTP server, connect to DB and etc.
-func (s *APIServer) Start() error {
-	if err := s.configureLogger(); err != nil {
-		return err
-	}
-
-	s.configureRouter()
-
-	// конфигурирует Store, вызывает у него метод Open()
-	// если все удается, записать в поле `store` ToDoserver ссылку на наше хранилище
-	if err := s.configureStore(); err != nil {
-		return err
-	}
-
-	return http.ListenAndServe(s.config.BindAddr, s.router) // return err = http.ListenAndServe()
-}
-
-// configureLogger - configures the logger
-func (s *APIServer) configureLogger() error {
-	level := new(slog.Level)
-	err := level.UnmarshalText([]byte(s.config.LogLevel))
+func Start(config *Config) error {
+	db, err := newDB(config.DatabaseURL)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("log level is %v\n", level)
+	defer db.Close()
+	store := sqlstore.New(db)
+	logger := newLogger(config.LogLevel)
+	srv := newServer(store, logger)
 
-	lvlVar.Set(*level) // set the level from todoserver.yaml
-	return nil
+	return http.ListenAndServe(config.BindAddr, srv)
 }
 
-func (s *APIServer) configureRouter() {
-	s.router.Handle("/", http.FileServer(http.Dir("./web")))
-	s.router.HandleFunc("/hello", s.handleHello())
-}
-
-func (s *APIServer) configureStore() error {
-	db, err := sql.Open("sqlite", s.config.DatabaseURL)
+func newDB(databaseURL string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", databaseURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := sqlstore.CreateTable(db, s.config.DatabaseURL); err != nil {
-		return err
+	if err := sqlstore.CreateTable(db, databaseURL); err != nil {
+		return nil, err
 	}
 
-	s.store = sqlstore.New(db)
-
-	return nil
+	return db, nil
 }
 
-func (s *APIServer) handleHello() http.HandlerFunc {
-	// ...
+func newLogger(logLevel string) *slog.Logger {
+	levelVar := new(slog.Level)
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "Hello")
+	if err := levelVar.UnmarshalText([]byte(logLevel)); err != nil {
+		log.Println(err.Error())
+		levelVar = nil
 	}
+
+	textHandler := slog.NewTextHandler(
+		os.Stderr,
+		&slog.HandlerOptions{Level: levelVar})
+
+	return slog.New(textHandler)
 }

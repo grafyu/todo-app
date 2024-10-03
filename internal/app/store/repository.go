@@ -6,4 +6,5 @@ import "github.com/grafyu/todo-app/model"
 type TaskRepository interface {
 	Create(*model.Task) error
 	FindByDate(string) (*model.Task, error)
+	// FindByRule(string) (*model.Task, error)
 }
