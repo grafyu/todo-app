@@ -2,10 +2,9 @@ package model
 
 import (
 	"errors"
-	"fmt"
+	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation"
 )
@@ -19,70 +18,107 @@ type Task struct {
 	Repeat  string
 }
 
-// checkParam() - проверяем значения параметров
-// по границам заданного диапазона
-func checkParam(values string, min int, max int) error {
-	for _, value := range strings.Split(values, ",") { // разбиваем группу аргументов на отдельные значения
-		num, _ := strconv.Atoi(value)
-		if num < min || num > max || num == 0 {
-			return errors.New("недопустимое значение параметров повторения\nвыход за диапазон или нулевое значение")
-		}
-	}
-
-	return nil
-}
-
 func checkRepeatFormat(repeat interface{}) error {
-	// в зависимости от первого символа здесь будет
-	// выбираться шаблон для валидации
 	params := strings.Split(repeat.(string), " ")
 
-	switch params[0] {
-	case "y":
-		if len(params) == 1 {
-			return nil
-		}
-	case "d":
-		switch len(params) {
-		case 1:
-			return errors.New("не указан интервал в днях")
-		case 2:
-			return checkParam(params[1], 1, 400)
-		default:
-			return errors.New("too many parameters")
-		}
+	errFormat := errors.New("not correct the repeate format")
 
-	case "w":
-		switch len(params) {
-		case 1:
-			return errors.New("не указаны дни недели")
-		case 2:
-			return checkParam(params[1], 1, 12)
-		default:
-			return errors.New("too many parameters")
-		}
-	case "m":
-		switch len(params) {
-		case 1:
-			return errors.New("не указаны дни месяца")
-		case 2:
-			return checkParam(params[1], -2, 31)
-		case 3:
-			if err := checkParam(params[1], -2, 31); err != nil {
-				return err
-			}
-			return checkParam(params[2], 1, 12)
-		default:
-			return errors.New("too many parameters")
-		}
-	default:
-		return errors.New("недопустимый символ параметра")
-
+	// symbol check
+	if !slices.Contains([]string{"y", "d", "w", "m"}, params[0]) {
+		return errors.New("invalid symbol")
 	}
 
-	fmt.Println("All right !!!")
+	// rule string format check
+	switch params[0] {
+	case "y":
+		if len(params) > 1 {
+			return errFormat
+		}
+	case "d":
+		if len(params) < 2 {
+			return errors.New("missing interval in days")
+		}
+
+		if len(params) == 2 {
+			days, err := strconv.Atoi(params[1])
+			if err != nil {
+				return err
+			}
+
+			if days < 1 && days > 400 {
+				return errors.New("maximum allowable interval is exceeded")
+			}
+		}
+
+		return errFormat
+
+	case "w":
+		if len(params) < 2 {
+			return errors.New("missing days of the week")
+		}
+
+		if len(params) == 2 {
+			weekdays, err := charToInt(strings.Split(params[1], ","))
+			if err != nil {
+				return err
+			}
+
+			if slices.Min(weekdays) < 1 || slices.Max(weekdays) > 7 {
+				return errors.New("invalid value of weekday")
+			}
+		}
+
+		return errFormat
+
+	case "m":
+		if len(params) < 2 {
+			return errors.New("missing days of the month")
+		}
+
+		if len(params) == 2 {
+			monthdays, err := charToInt(strings.Split(params[1], ","))
+			if err != nil {
+				return err
+			}
+
+			if slices.Min(monthdays) < -2 || slices.Max(monthdays) > 31 || slices.Max(monthdays) == 0 {
+				return errors.New("invalid value of monthday")
+			}
+		}
+
+		if len(params) == 3 {
+			months, err := charToInt(strings.Split(params[2], ","))
+			if err != nil {
+				return err
+			}
+
+			if slices.Min(months) < 1 || slices.Max(months) > 12 {
+				return errors.New("invalid value of month")
+			}
+		}
+
+		return errFormat
+	}
 
 	return nil
+
+}
+
+// convert []string to []int and sort result slice
+func charToInt(charSl []string) ([]int, error) {
+	var intSl []int
+	for _, char := range charSl {
+		num, err := strconv.Atoi(char)
+		if err != nil {
+			return nil, err
+		}
+
+		intSl = append(intSl, num)
+	}
+
+	slices.Sort(intSl)
+
+	return intSl, nil
 }
 
 // Validate() - валидация данных task
@@ -107,9 +143,4 @@ func (tsk *Task) BeforeCreate() error {
 // После возвращения ответа на запрос от handler
 func BeforeSend() error {
 	return nil
-}
-
-// NextDate - calculates the next date according to the specified rule
-func NextDate(now time.Time, date string, repeat string) (string, error) {
-	return "", nil
 }
