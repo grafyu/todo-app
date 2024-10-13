@@ -13,175 +13,116 @@ const (
 	monthInYear = 12
 )
 
-var (
-	nextDate time.Time
-	// deltaYear, deltaMonth, deltaDay int
-)
-
 // NextDate - calculates the next date according to the specified rule
 func NextDate(now time.Time, date string, repeat string) (string, error) {
 	// start - the date of Task start
-	start, err := time.Parse("20060102", date)
+	var (
+		start time.Time // start task time
+		next  time.Time // next task time (after curret)
+		err   error
+	)
+
+	if err := checkRepeatFormat(repeat); err != nil {
+		return "", err
+	}
+
+	start, err = time.Parse("20060102", date)
 	if err != nil {
 		return "", err
 	}
 
 	switch strings.Split(repeat, " ")[0] {
 	case "y":
-		rule := strings.Split(repeat, " ")
-		// check
-		if len(rule) != 1 {
-			return "", errors.New("not correct the repeate year format")
+		// сразу прибавляем год
+		next = start.AddDate(1, 0, 0)
+
+		// если прибавленного года не хватает
+		for now.Compare(next) >= 0 {
+			next = next.AddDate(1, 0, 0)
 		}
 
-		nextDate = start
-		// calculate nextDate
-		for nextDate.Before(now) {
-			nextDate = nextDate.AddDate(1, 0, 0)
-		}
-
-		return nextDate.Format("20060102"), nil
+		return next.Format("20060102"), nil
 
 	case "d":
-		rule := strings.Split(repeat, " ")
-		// check
-
-		if len(rule) < 2 {
-			return "", errors.New("not specified interval in days")
-		} else if len(rule) > 2 {
-			return "", errors.New("not correct the repeate day format")
-		}
-
-		interval, err := strconv.Atoi(rule[1])
+		interval, err := strconv.Atoi(strings.Split(repeat, " ")[1])
 		if err != nil {
 			return "", err
 		}
 
-		if interval > 400 || interval < 1 {
-			return "", errors.New("wrong number of days in an interval")
+		next = start.AddDate(0, 0, interval)
+
+		for now.Compare(next) >= 0 {
+			next = start.AddDate(0, 0, interval)
 		}
 
-		// start of next day search
-		nextDate := start
-		for nextDate.Before(now) {
-			nextDate = nextDate.AddDate(0, 0, interval)
-		}
-
-		return nextDate.Format("20060102"), nil
+		return next.Format("20060102"), nil
 
 	case "w":
-		rule := strings.Split(repeat, " ")
-		// check items
-		if len(rule) < 2 {
-			return "", errors.New("not specified days of the week")
-		} else if len(rule) > 2 {
-			return "", errors.New("not correct the repeate week format")
-		}
+		// получить дни недели скорректированные на дни от 1 до 0
+		daysWeek := correctWeek(strings.Split(strings.Split(repeat, " ")[1], ","))
 
-		// check rules param
-		daysWeek := strings.Split(rule[1], ",")
-		numsWeek, err := charsToInts(daysWeek)
+		// создать календарь текущей недели и отметить дни недели
+		ruleClndr, err := ruleCalendar(createClndr(dayInWeek), daysWeek)
 		if err != nil {
 			return "", err
 		}
 
-		slices.Sort(numsWeek)
-		if numsWeek[0] < 1 || numsWeek[len(numsWeek)-1] > 7 {
-			return "", errors.New("wrong number of days of the week")
+		// найти следующий день задачи после стартового
+		next = start.AddDate(0, 0, 1)
+
+		// день недели старта задачи
+		for !ruleClndr[int(next.Weekday())] || (now.Compare(next) >= 0) {
+			next = next.AddDate(0, 0, 1)
 		}
 
-		// create a calendar and apply a repetition rule
-		clndr := createClndr(dayInWeek)
-		pointWeekDays := strings.Split(rule[1], ",")
-		ruleClndr, err := ruleCalendar(clndr, pointWeekDays)
-		if err != nil {
-			return "", err
-		}
-
-		// start of search a next_date
-		nextDate := start
-		for weekday := int(start.Weekday()); !ruleClndr[weekday] || nextDate.Before(now); weekday++ {
-			nextDate = nextDate.AddDate(0, 0, 1)
-			if weekday == 7 {
-				weekday = 0
-			}
-		}
-
-		return nextDate.Format("20060102"), nil
+		return next.Format("20060102"), nil
 
 	case "m":
 		rule := strings.Split(repeat, " ")
 
-		if len(rule) < 2 {
-			return "", errors.New("not specified days of month")
-		}
-
-		// check rules param
-		if len(rule) == 2 {
-			daysMnth := strings.Split(rule[1], ",")
-			numsMnth, err := charsToInts(daysMnth)
-			if err != nil {
-				return "", err
-			}
-
-			slices.Sort(numsMnth)
-			if numsMnth[0] < -2 || numsMnth[len(numsMnth)-1] > 31 {
-				return "", errors.New("wrong number days of the month")
-			}
-		}
-
-		if len(rule) == 3 {
-			daysMnth := strings.Split(rule[2], ",")
-			numsMnth, err := charsToInts(daysMnth)
-			if err != nil {
-				return "", err
-			}
-
-			slices.Sort(numsMnth)
-			if numsMnth[0] < 1 || numsMnth[len(numsMnth)-1] > 12 {
-				return "", errors.New("wrong number month")
-			}
-		}
-
 		// create a monthday rule slice
-		pointMonthYear := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"}
+		month := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"}
 		if len(rule) == 3 {
-			pointMonthYear = strings.Split(rule[2], ",")
+			month = strings.Split(rule[2], ",")
 		}
 
 		// create calendar map and apply a repetition rule
 		monthsClndr := createClndr(monthInYear)
-		ruleMonthsClndr, err := ruleCalendar(monthsClndr, pointMonthYear)
+		ruleMonthsClndr, err := ruleCalendar(monthsClndr, month)
 		if err != nil {
 			return "", err
 		}
 
-		// start of search a next_date
-		nextDate := start
-		// внешний цикл для итерации по месяцам. в нем проверяется
+		// next должен быть больше start хотябы на один день
+		next := start.AddDate(0, 0, 1)
+
 		for {
-			// поиск nextDay в nextMonth
-			if ruleMonthsClndr[int(nextDate.Month())] && now.Before(nextDate) {
-				ruleDaysClndr, err := calendarMonthDay(nextDate, rule)
+			// next принадлежит текущему месяцу ?
+			if ruleMonthsClndr[int(next.Month())] {
+				// создаем кадендарь дней и отмечаем эти дни в текущем месяце
+				ruleDaysClndr, err := calendarMonthDay(next, rule)
 				if err != nil {
 					return "", err
 				}
 
 				// итерации по календарю месяца
-				for !ruleDaysClndr[nextDate.Day()] || nextDate.Before(now) {
-					nextDate = nextDate.AddDate(0, 0, 1)
+				for !ruleDaysClndr[next.Day()] { // если нет очередного дня или месяца
+					next = next.AddDate(0, 0, 1)
 				}
-				if ruleMonthsClndr[int(nextDate.Month())] && ruleDaysClndr[nextDate.Day()] {
-					return nextDate.Format("20060102"), nil
-				}
-			} else {
-				nextDate = nextDate.AddDate(0, 0, 1)
 
+				// найденная дата до текущей даты?
+				if now.Before(next) {
+					return next.Format("20060102"), nil
+				}
+
+			} else {
+				next = next.AddDate(0, 0, 1)
 			}
 		}
-	}
 
+	}
 	return "", errors.New("invalid character of repeat mod")
+
 }
 
 func calendarMonthDay(nextDate time.Time, rule []string) (map[int]bool, error) {
@@ -192,7 +133,6 @@ func calendarMonthDay(nextDate time.Time, rule []string) (map[int]bool, error) {
 	ruleDays = replaceRelativeDates(ruleDays, maxDays)
 
 	return ruleCalendar(daysClndr, ruleDays)
-
 }
 
 // вычисляет последнюю дату месяца по текущему времени
@@ -257,4 +197,17 @@ func charsToInts(charSl []string) ([]int, error) {
 	slices.Sort(intSl)
 
 	return intSl, nil
+}
+
+func correctWeek(days []string) []string {
+	var day []string
+
+	for _, d := range days {
+		if d == "7" {
+			d = "0"
+		}
+		day = append(day, d)
+	}
+	slices.Sort(day)
+	return day
 }

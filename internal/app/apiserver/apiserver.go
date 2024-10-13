@@ -17,6 +17,7 @@ func Start(config *Config) error {
 	}
 
 	defer db.Close()
+
 	store := sqlstore.New(db)
 	logger := newLogger(config.LogLevel)
 	srv := newServer(store, logger)
