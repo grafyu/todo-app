@@ -108,8 +108,9 @@ func (s *server) handleCreateTask() http.HandlerFunc {
 				return
 			}
 
-		// изменение Задачи
+		// Редактирование Задачи
 		case http.MethodPut:
+
 			type Temp struct {
 				ID      string
 				Date    string
@@ -118,8 +119,12 @@ func (s *server) handleCreateTask() http.HandlerFunc {
 				Repeat  string
 			}
 
-			var temp Temp
-			var task model.Task
+			var (
+				temp Temp
+				task model.Task
+			)
+
+			answer := make(map[string]any)
 
 			_, err := buf.ReadFrom(r.Body)
 			if err != nil {
@@ -145,9 +150,7 @@ func (s *server) handleCreateTask() http.HandlerFunc {
 
 			err = s.store.Task().ChangeTask(&task)
 			if err != nil {
-				answer["error"] = err.Error()
-			} else {
-				answer["id"] = []string{}
+				answer["error"] = "Задача не найдена"
 			}
 
 			resp, err = json.Marshal(answer)
