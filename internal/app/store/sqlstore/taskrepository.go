@@ -102,7 +102,7 @@ func (r TaskRepository) ChangeTask(t *model.Task) error {
 		return err
 	}
 
-	r.store.db.QueryRow("UPDATE scheduler SET date = :date, title = :title, comment = :comment, repeat = :repeat WHERE id = :id",
+	_, err := r.store.db.Exec("UPDATE scheduler SET date = :date, title = :title, comment = :comment, repeat = :repeat WHERE id = :id",
 		sql.Named("date", t.Date),
 		sql.Named("title", t.Title),
 		sql.Named("comment", t.Comment),
@@ -110,7 +110,7 @@ func (r TaskRepository) ChangeTask(t *model.Task) error {
 		sql.Named("id", t.ID),
 	)
 
-	return nil
+	return err
 }
 
 func (r TaskRepository) DeleteByID(id string) error {
@@ -129,6 +129,7 @@ func (r TaskRepository) DeleteByID(id string) error {
 // FindByDate - найти Task по дате,
 func (r TaskRepository) FindByID(id int) (*model.Task, error) {
 	tsk := &model.Task{}
+
 	if err := r.store.db.QueryRow(
 		"SELECT id, date, title, comment, repeat FROM scheduler WHERE id = :id",
 		sql.Named("id", id),
@@ -140,10 +141,8 @@ func (r TaskRepository) FindByID(id int) (*model.Task, error) {
 		&tsk.Repeat,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errors.New("задача не найдена")
+			return nil, errors.New("задача не haha найдена")
 		}
-
-		return nil, err
 	}
 
 	return tsk, nil

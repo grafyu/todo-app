@@ -1,2 +1,6 @@
 *.ffs_db
 *.txt
+sqlite3
+/todo-list
+*.db
+*/.vscode/*

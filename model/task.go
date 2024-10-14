@@ -133,7 +133,6 @@ func checkDateFormat(date interface{}) error {
 	}
 
 	return nil
-
 }
 
 // Validate() - валидация данных task
@@ -143,10 +142,9 @@ func (tsk *Task) Validate() error {
 		tsk,
 		validation.Field(&tsk.Title, validation.Required),
 		validation.Field(&tsk.Date, validation.By(checkDateFormat)),
-		// validation.Field(&tsk.Date, validation.Date("20060102")),
 		validation.Field(&tsk.Repeat, validation.By(checkRepeatFormat)),
 	)
-
+	// validation.Field(&tsk.Date, validation.Date("20060102")),
 }
 
 // BeforeCreate - запускается при созданием task
@@ -181,29 +179,3 @@ func (t Task) MarshalJSON() ([]byte, error) {
 
 	return json.Marshal(aux)
 }
-
-// func (t Task) UnmarshalJSON([]byte) error {
-
-// 	var id int
-
-// 	t.ID, err := strconv.Atoi(id)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	aux := struct {
-// 		ID      int    `json:"id"`
-// 		Date    string `json:"date"`
-// 		Title   string `json:"title"`
-// 		Comment string `json:"comment"`
-// 		Repeat  string `json:"repeat"`
-// 	}{
-// 		ID:      id,
-// 		Date:    t.Date,
-// 		Title:   t.Title,
-// 		Comment: t.Comment,
-// 		Repeat:  t.Repeat,
-// 	}
-
-// 	return nil
-// }

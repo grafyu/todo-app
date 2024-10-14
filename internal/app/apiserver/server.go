@@ -56,11 +56,21 @@ func (s *server) configureRouter() {
 func (s *server) handleCreateTask() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var task model.Task
-		var buf bytes.Buffer
-		var resp []byte
+		var (
+			task   model.Task
+			buf    bytes.Buffer
+			resp   []byte
+			answer any
+		)
 
-		answer := make(map[string]any)
+	type Answer struct {
+		err	error
+		id int
+		task model.Task
+	}
+
+		errAnswer := make(map[string]any)
+		okAnswer := make(map[string]any)
 
 		switch r.Method {
 		// создание Задачи
@@ -79,16 +89,18 @@ func (s *server) handleCreateTask() http.HandlerFunc {
 			err = s.store.Task().Create(&task)
 			if err != nil {
 				// http.Error(w, err.Error(), http.StatusInternalServerError)
-				answer["error"] = err.Error()
+				errAnswer["error"] = err.Error()
+				answer = errAnswer["error"]
 			} else {
-				answer["id"] = strconv.Itoa(task.ID)
+				okAnswer["id"] = strconv.Itoa(task.ID)
+				answer = okAnswer["id"]
 			}
 
-			resp, err = json.Marshal(answer)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
+			// resp, err = json.Marshal(answer)
+			// if err != nil {
+			// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+			// 	return
+			// }
 
 		// поиск Задачи по id
 		case http.MethodGet:
@@ -99,7 +111,8 @@ func (s *server) handleCreateTask() http.HandlerFunc {
 
 			task, err := s.store.Task().FindByID(id)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				errAnswer["error"] = err
+				answer = errAnswer["error"]
 			}
 
 			resp, err = json.Marshal(task)
@@ -150,13 +163,15 @@ func (s *server) handleCreateTask() http.HandlerFunc {
 
 			err = s.store.Task().ChangeTask(&task)
 			if err != nil {
-				answer["error"] = "Задача не найдена"
-			}
-
-			resp, err = json.Marshal(answer)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+				errAnswer["error"] = err
+				answer := errAnswer["error"]
+				fmt.Println(answer) // test
+			} else {
+				_, err := s.store.Task().FindByID(task.ID)
+				if err != nil {
+					errAnswer["error"] = err
+					answer = errAnswer["error"]
+				}
 			}
 
 		// удаление Задачи
@@ -165,15 +180,16 @@ func (s *server) handleCreateTask() http.HandlerFunc {
 
 			err := s.store.Task().DeleteByID(id)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				errAnswer["error"] = err
+				answer = errAnswer["error"]
 			}
 
-			resp, err = json.Marshal(answer)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
+		}
 
+		resp, err := json.Marshal(answer)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -258,6 +274,8 @@ func (s *server) handleCheck() http.HandlerFunc {
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
+
+		
 
 			if task.Repeat == "" {
 				err := s.store.Task().DeleteByID(id)
