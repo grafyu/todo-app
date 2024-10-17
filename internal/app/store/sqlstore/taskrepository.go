@@ -4,7 +4,6 @@ package sqlstore
 
 import (
 	"database/sql"
-	"fmt"
 	"strconv"
 
 	"github.com/grafyu/todo-app/internal/app/store"
@@ -104,8 +103,6 @@ func (r TaskRepository) ChangeTask(t model.Task) error {
 	if err := t.BeforeCreate(); err != nil {
 		return err
 	}
-
-	fmt.Printf("NextDate для перезаписи ПОСЛЕ это - %v\n", t.Date)
 
 	_, err := r.store.db.Exec("UPDATE scheduler SET date = :date, title = :title, comment = :comment, repeat = :repeat WHERE id = :id",
 		sql.Named("date", t.Date),

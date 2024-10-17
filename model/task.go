@@ -85,8 +85,8 @@ func checkRepeatFormat(repeat interface{}) error {
 
 		// check rules param
 		if len(rule) == 2 {
-			daysMnth := strings.Split(rule[1], ",")
-			numsMnth, err := charsToInts(daysMnth)
+			days := strings.Split(rule[1], ",")
+			numsMnth, err := charsToInts(days)
 			if err != nil {
 				return err
 			}
@@ -98,8 +98,8 @@ func checkRepeatFormat(repeat interface{}) error {
 		}
 
 		if len(rule) == 3 {
-			daysMnth := strings.Split(rule[2], ",")
-			numsMnth, err := charsToInts(daysMnth)
+			days := strings.Split(rule[2], ",")
+			numsMnth, err := charsToInts(days)
 			if err != nil {
 				return err
 			}

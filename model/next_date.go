@@ -11,18 +11,11 @@ import (
 
 func NextDate(now time.Time, date string, repeat string) (string, error) {
 
-	loc, _ := time.LoadLocation("Europe/Moscow")
-
-	start, err := time.ParseInLocation("20060102", date, loc)
-	if err != nil {
-		return "", err
-	}
-
-	now = now.In(loc).Truncate(time.Hour)
-
-	fmt.Println(now) // test
-
-	next := start
+	var (
+		next  time.Time
+		start time.Time
+		err   error
+	)
 
 	weekdays := map[string]string{
 		"1": "Monday",
@@ -49,13 +42,33 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		"12": "December",
 	}
 
+	loc, _ := time.LoadLocation("Europe/Moscow")
+
+	now = now.In(loc).Truncate(time.Hour)
+
+	start, err = time.ParseInLocation("20060102", date, loc)
+	// start, err = time.Parse("20060102", date)
+	if err != nil {
+		return "", err
+	}
+
+	if err := checkRepeatFormat(repeat); err != nil {
+		return "", err
+	}
+
 	switch strings.Split(repeat, " ")[0] {
+
 	case "y":
+		next := start
+
+		next = next.AddDate(1, 0, 0)
+
 		for next.Before(now) {
 			next = next.AddDate(1, 0, 0)
 		}
 
-		return next.AddDate(1, 0, 0).Format("20060102"), nil
+		return next.Format("20060102"), nil
+		// return next.Format("20060102"), nil
 
 	case "d":
 		interval, err := strconv.Atoi(strings.Split(repeat, " ")[1])
@@ -66,15 +79,28 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		// next = start.AddDate(0, 0, interval)
 		next = start
 
+		next = next.AddDate(0, 0, interval)
+
 		for next.Before(now) {
 			next = next.AddDate(0, 0, interval)
 		}
 
-		return next.AddDate(0, 0, interval).Format("20060102"), nil
+		return next.Format("20060102"), nil
 
 	case "w":
+
+		var next time.Time
+
+		// next = now
+
+		if now.Before(start) {
+			next = start
+		} else {
+			next = now
+		}
+
 		digits := strings.Split(repeat, " ")[1]
-		// digits = strings.Replace(digits, "7", "0", 1)		// заменили "7" на "0"
+		// digits = strings.Replace(digits, "7", "0", 1) // заменили "7" на "0"
 
 		daysNumb := strings.Split(digits, ",")
 
@@ -86,16 +112,18 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 			next                          time.Time
 		)
 
-		// if now.Before(start) {
-		// 	next = start
-		// } else {
-		// 	next = now
-		// }
+		if now.Before(start) {
+			next = start
+		} else {
+			next = now
+		}
 
-		next = now
-
-		daysNmb = relativeDay(next,
+		daysNmbZero := relativeDay(next,
 			strings.Split(strings.Split(repeat, " ")[1], ","))
+
+		for _, d := range daysNmbZero {
+			daysNmb = append(daysNmb, strings.TrimLeft(d, "0"))
+		}
 
 		if len(strings.Split(repeat, " ")) == 3 {
 			// []string
@@ -103,7 +131,8 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 
 			// составляем monthNumb - список заданных месяцев
 			for _, mn := range monthNmb {
-				monthPoint = append(monthPoint, months[mn])
+				mnth := strings.TrimLeft(mn, "0")
+				monthPoint = append(monthPoint, months[mnth])
 			}
 
 		} else {
@@ -112,16 +141,6 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 				monthPoint = append(monthPoint, value)
 			}
 		}
-
-		slices.Sort(monthPoint)
-		slices.Sort(daysNmb)
-
-		next, err = findDayInMonth(next, daysNmb, monthPoint)
-		if err != nil {
-			return "", err
-		}
-
-		next = next.AddDate(0, 0, 1)
 
 		next, err = findDayInMonth(next, daysNmb, monthPoint)
 		if err != nil {
@@ -132,6 +151,28 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 	}
 
 	return "", errors.New("неправильная буква repeate rule mode")
+}
+
+// Поиск следующего дня заданного месяца
+func findDayInMonth(nxt time.Time, daysNmb []string, monthPoint []string) (time.Time, error) {
+
+	for range monthPoint {
+		for !slices.Contains(monthPoint, nxt.Month().String()) {
+			nxt = nxt.AddDate(0, 0, 1)
+		}
+
+		// перебираем дни до конца месяца, пока не сменится текущий месяц
+		currMonth := nxt.Month()
+
+		for currMonth == nxt.Month() {
+			nxt = nxt.AddDate(0, 0, 1)
+			if slices.Contains(daysNmb, fmt.Sprint(nxt.Day())) {
+				return nxt, nil
+			}
+		}
+	}
+
+	return nxt, errors.New("не найден день по заданному rule repeate")
 }
 
 // convert []string to []int and sort result slice
@@ -157,14 +198,7 @@ func nextCheckDay(next time.Time, daysNumb []string, weekdays map[string]string)
 		days = append(days, weekdays[dn])
 	}
 
-	checkDayNow := slices.Contains(days, next.Weekday().String())
-
-	// если данный "next" это checkDayNow, то пропускаем его поиск
-	if !checkDayNow {
-		for !slices.Contains(days, next.Weekday().String()) {
-			next = next.AddDate(0, 0, 1)
-		}
-	}
+	next = next.AddDate(0, 0, 1)
 
 	// ищем checkDayNew ...
 	for !slices.Contains(days, next.Weekday().String()) {
@@ -173,51 +207,6 @@ func nextCheckDay(next time.Time, daysNumb []string, weekdays map[string]string)
 
 	return next
 }
-
-// func nextCheckMonthday(next time.Time, monthNmb []string, daysNmb []string, month [string]string) {
-// 	var months []string
-
-// 	for mn := range monthNmb {
-// 		months = append(months, weekdays[mn])
-// 	}
-
-// 	// проверить - next есть в monthNumb
-// 	checkMonthNow := slices.Contains(months, int(next.Month()))
-
-// 	if !checkMonthNow {
-// 		nextMonthday()
-// 	}
-
-// 	if !checkDayNow {
-// 		nextMonthday()
-// 	}
-
-// }
-
-// ищет заданные дни в заданном месяце
-func findDayInMonth(nxt time.Time, daysNmb []string, monthPoint []string) (time.Time, error) {
-
-	// проверить, что monthPoint не пустой !!!!
-
-	for range monthPoint {
-		for !slices.Contains(monthPoint, nxt.Month().String()) {
-			nxt = nxt.AddDate(0, 1, 0)
-		}
-
-		// перебираем дни до конца месяца, пока не сменится текущий месяц
-		currMonth := nxt.Month()
-
-		for currMonth == nxt.Month() {
-			if slices.Contains(daysNmb, fmt.Sprint(nxt.Day())) {
-				return nxt, nil
-			}
-			nxt = nxt.AddDate(0, 0, 1)
-		}
-	}
-
-	return nxt, errors.New("не найден день по заданному rule repeate")
-}
-
 
 // Заменяем относительные номера дней месяца
 func relativeDay(nxt time.Time, daysNmb []string) []string {
