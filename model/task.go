@@ -24,8 +24,6 @@ type Task struct {
 func checkRepeatFormat(repeat interface{}) error {
 	rule := strings.Split(repeat.(string), " ")
 
-	// errFormat := errors.New("not correct the repeate format")
-
 	// symbol check
 	if !slices.Contains([]string{"y", "d", "w", "m", ""}, rule[0]) {
 		return errors.New("invalid symbol")
@@ -111,25 +109,18 @@ func checkRepeatFormat(repeat interface{}) error {
 				return errors.New("wrong number month")
 			}
 		}
+		// case "":
+		// 	return nil
 
 	}
+
 	return nil
 }
 
 func checkDateFormat(date interface{}) error {
-	dateField := date.(string)
-
-	if dateField == "" {
-		return errors.New("не задана дата задания")
-	}
-
-	dateTime, err := time.Parse("20060102", dateField)
+	_, err := time.Parse("20060102", date.(string))
 	if err != nil {
 		return errors.New("неверный формат даты задания")
-	}
-
-	if dateTime.Before(time.Now()) {
-		return errors.New("дата задания не может быть раньше текущей даты")
 	}
 
 	return nil
@@ -138,10 +129,14 @@ func checkDateFormat(date interface{}) error {
 // Validate() - валидация данных task
 // отправленных frontend
 func (tsk *Task) Validate() error {
+	if tsk.Date == "" {
+		return nil
+	}
+
 	return validation.ValidateStruct(
 		tsk,
-		validation.Field(&tsk.Title, validation.Required),
 		validation.Field(&tsk.Date, validation.By(checkDateFormat)),
+		validation.Field(&tsk.Title, validation.Required),
 		validation.Field(&tsk.Repeat, validation.By(checkRepeatFormat)),
 	)
 	// validation.Field(&tsk.Date, validation.Date("20060102")),
@@ -150,6 +145,32 @@ func (tsk *Task) Validate() error {
 // BeforeCreate - запускается при созданием task
 // здесь валидируются данные перед запись task в DB
 func (tsk *Task) BeforeCreate() error {
+	now := time.Now()
+
+	if tsk.Date == "" {
+		tsk.Date = now.Format("20060102")
+	}
+
+	date, err := time.Parse("20060102", tsk.Date)
+
+	if err != nil {
+		return err
+	}
+
+	if date.Before(now) {
+
+		if tsk.Repeat == "" {
+			tsk.Date = now.Format("20060102")
+
+		} else {
+			tsk.Date, err = NextDate(now, tsk.Date, tsk.Repeat)
+			if err != nil {
+				return err
+			}
+
+		}
+	}
+
 	return nil
 }
 

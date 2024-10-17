@@ -3,10 +3,10 @@ package apiserver
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -40,12 +40,12 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // configureRouter - ...
 func (s *server) configureRouter() {
-	// ...
+
 	s.router.Handle("/", http.FileServer(http.Dir("./web")))
-	// s.router.HandleFunc("")
+
 	s.router.HandleFunc("/api/nextdate", s.handleNextDate())
 
-	s.router.HandleFunc("/api/task", s.handleCreateTask())
+	s.router.HandleFunc("/api/task", s.handleTask())
 
 	s.router.HandleFunc("/api/tasks", s.handleTaskList())
 
@@ -53,140 +53,69 @@ func (s *server) configureRouter() {
 
 }
 
-func (s *server) handleCreateTask() http.HandlerFunc {
+func (s *server) handleTask() http.HandlerFunc {
+
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var (
-			task   model.Task
-			buf    bytes.Buffer
-			resp   []byte
-			answer any
+			buf      bytes.Buffer
+			resp     []byte
+			answer   any
+			task     model.Task
+			urlValue url.Values
+			err      error
 		)
 
-	type Answer struct {
-		err	error
-		id int
-		task model.Task
-	}
+		taskRepo := s.store.Task()
 
-		errAnswer := make(map[string]any)
-		okAnswer := make(map[string]any)
+		if r.Method == http.MethodPost || r.Method == http.MethodPut {
+			_, err := buf.ReadFrom(r.Body)
+			if err != nil {
+				answer = map[string]string{"error": err.Error()}
+			}
+		} else {
+			urlValue = r.URL.Query()
+		}
 
+		// Создание, Поиск, Редактирование, Удаление на пути "/api/task"
 		switch r.Method {
-		// создание Задачи
+
 		case http.MethodPost:
-			_, err := buf.ReadFrom(r.Body)
+			id, err := AddTask(taskRepo, buf)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			err = s.store.Task().Create(&task)
-			if err != nil {
-				// http.Error(w, err.Error(), http.StatusInternalServerError)
-				errAnswer["error"] = err.Error()
-				answer = errAnswer["error"]
+				answer = map[string]string{"error": err.Error()}
 			} else {
-				okAnswer["id"] = strconv.Itoa(task.ID)
-				answer = okAnswer["id"]
+				answer = map[string]string{"id": id}
 			}
 
-			// resp, err = json.Marshal(answer)
-			// if err != nil {
-			// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-			// 	return
-			// }
-
-		// поиск Задачи по id
 		case http.MethodGet:
-			id, err := strconv.Atoi(r.URL.Query().Get("id"))
+			task, err = FindTask(taskRepo, urlValue)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-
-			task, err := s.store.Task().FindByID(id)
-			if err != nil {
-				errAnswer["error"] = err
-				answer = errAnswer["error"]
-			}
-
-			resp, err = json.Marshal(task)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-		// Редактирование Задачи
-		case http.MethodPut:
-
-			type Temp struct {
-				ID      string
-				Date    string
-				Title   string
-				Comment string
-				Repeat  string
-			}
-
-			var (
-				temp Temp
-				task model.Task
-			)
-
-			answer := make(map[string]any)
-
-			_, err := buf.ReadFrom(r.Body)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			if err = json.Unmarshal(buf.Bytes(), &temp); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			task.ID, err = strconv.Atoi(temp.ID)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			task.Date = temp.Date
-			task.Title = temp.Title
-			task.Comment = temp.Comment
-			task.Repeat = temp.Repeat
-
-			err = s.store.Task().ChangeTask(&task)
-			if err != nil {
-				errAnswer["error"] = err
-				answer := errAnswer["error"]
-				fmt.Println(answer) // test
+				answer = map[string]string{"error": err.Error()}
 			} else {
-				_, err := s.store.Task().FindByID(task.ID)
-				if err != nil {
-					errAnswer["error"] = err
-					answer = errAnswer["error"]
-				}
+				answer = task
 			}
 
-		// удаление Задачи
-		case http.MethodDelete:
-			id := r.URL.Query().Get("id")
-
-			err := s.store.Task().DeleteByID(id)
+		case http.MethodPut:
+			_, err = EditTask(taskRepo, buf)
 			if err != nil {
-				errAnswer["error"] = err
-				answer = errAnswer["error"]
+				answer = map[string]string{"error": err.Error()}
+
+			} else {
+				answer = model.Task{}
+			}
+
+		case http.MethodDelete:
+			err := DeleteTask(taskRepo, urlValue)
+			if err != nil {
+				answer = map[string]string{"error": err.Error()}
+			} else {
+				answer = map[string]string{}
 			}
 
 		}
 
-		resp, err := json.Marshal(answer)
+		resp, err = json.Marshal(answer)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -195,25 +124,112 @@ func (s *server) handleCreateTask() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(resp)
-
 	}
+}
+
+// Новая задача
+func AddTask(taskRepo store.TaskRepository, buf bytes.Buffer) (string, error) {
+	var task model.Task
+
+	if err := json.Unmarshal(buf.Bytes(), &task); err != nil {
+		return "", err
+	}
+
+	err := taskRepo.Create(&task)
+	if err != nil {
+		return "", err
+	}
+
+	return strconv.Itoa(task.ID), nil
+
+}
+
+func EditTask(taskRepo store.TaskRepository, buf bytes.Buffer) (model.Task, error) {
+
+	type Temp struct {
+		Id      string
+		Date    string
+		Title   string
+		Comment string
+		Repeat  string
+	}
+
+	var (
+		tempo Temp
+		task  model.Task
+		err   error
+	)
+
+	if err = json.Unmarshal(buf.Bytes(), &tempo); err != nil {
+		return model.Task{}, err
+	}
+
+	task.ID, err = strconv.Atoi(tempo.Id)
+	if err != nil {
+		return model.Task{}, err
+	}
+
+	task.Date = tempo.Date
+	task.Title = tempo.Title
+	task.Comment = tempo.Comment
+	task.Repeat = tempo.Repeat
+
+	err = taskRepo.ChangeTask(task)
+	if err != nil {
+		return model.Task{}, err
+	} else {
+		_, err := taskRepo.FindByID(task.ID)
+		if err != nil {
+			return model.Task{}, err
+		}
+	}
+
+	return model.Task{}, nil
+}
+
+func FindTask(taskRepo store.TaskRepository, urlValue url.Values) (model.Task, error) {
+	id, err := strconv.Atoi(urlValue.Get("id"))
+
+	if err != nil {
+		return model.Task{}, err
+	}
+
+	task, err := taskRepo.FindByID(id)
+	if err != nil {
+		return model.Task{}, err
+	}
+
+	return task, nil
+}
+
+func DeleteTask(taskRepo store.TaskRepository, urlValue url.Values) error {
+	id := urlValue.Get("id")
+
+	err := taskRepo.DeleteByID(id)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // вывод на экран всех задач
 func (s *server) handleTaskList() http.HandlerFunc {
-
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		answer := make(map[string]any)
+		var (
+			answer any
+			tasks  []model.Task
+			err    error
+		)
+		taskRepo := s.store.Task()
 
 		if r.Method == http.MethodGet {
-			tasks, err := s.store.Task().View()
+			tasks, err = taskRepo.View()
 			if err != nil {
-				answer["error"] = err.Error()
+				answer = map[string]string{"error": err.Error()}
 			} else if tasks == nil {
-				answer["tasks"] = []model.Task{}
+				answer = map[string]string{}
 			} else {
-				answer["tasks"] = tasks
+				answer = map[string][]model.Task{"tasks": tasks}
 			}
 
 		}
@@ -253,52 +269,71 @@ func (s *server) handleNextDate() http.HandlerFunc {
 	}
 }
 
-// отметка выполненной задачи
+// Завершение выполненной задачи
 func (s *server) handleCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// var task model.Task
 		// var buf bytes.Buffer
-		var resp []byte
+		var (
+			task   model.Task
+			resp   []byte
+			answer any
+		)
 
-		// answer := make(map[string]any)
+		taskRepo := s.store.Task()
 
 		if r.Method == http.MethodPost {
 			id := r.URL.Query().Get("id")
 
 			idStr, err := strconv.Atoi(id)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				answer = map[string]string{"error": err.Error()}
 			}
 
-			task, err := s.store.Task().FindByID(idStr)
+			// Ищем задачу по Id
+			task, err = taskRepo.FindByID(idStr)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				answer = map[string]string{"error": err.Error()}
 			}
 
-		
-
+			// удаляем если не заданы повторения
 			if task.Repeat == "" {
-				err := s.store.Task().DeleteByID(id)
+				err := taskRepo.DeleteByID(id)
 				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					answer = map[string]string{"error": err.Error()}
+				} else {
+					answer = map[string]string{}
 				}
 
 			} else {
+				// ищем следующую дату задания, если повтрения заданы
 				task.Date, err = model.NextDate(time.Now(), task.Date, task.Repeat)
 				if err != nil {
-					fmt.Println("here")
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					answer = map[string]string{"error": err.Error()}
 				}
 
-				err = s.store.Task().ChangeTask(task)
+				// устанавливаем новую дату задачи
+				err = taskRepo.ChangeTask(task)
 				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					answer = map[string]string{"err": err.Error()}
+				} else {
+					answer = map[string]string{}
 				}
 			}
 
 		}
+
+		resp, err := json.Marshal(answer)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(resp)
 	}
 }
+
+// answer = map[string]string{"error": err.Error()}
+// } else {
+// 	answer = map[string]string{"id": id}

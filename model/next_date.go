@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,10 +16,9 @@ const (
 
 // NextDate - calculates the next date according to the specified rule
 func NextDate(now time.Time, date string, repeat string) (string, error) {
-	// start - the date of Task start
 	var (
 		start time.Time // start task time
-		next  time.Time // next task time (after curret)
+		next  time.Time // next task time (after current)
 		err   error
 	)
 
@@ -26,7 +26,9 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		return "", err
 	}
 
-	start, err = time.Parse("20060102", date)
+	loc, _ := time.LoadLocation("Europe/Moscow")
+
+	start, err = time.ParseInLocation("20060102", date, loc)
 	if err != nil {
 		return "", err
 	}
@@ -49,10 +51,13 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 			return "", err
 		}
 
-		next = start.AddDate(0, 0, interval)
+		// next = start.AddDate(0, 0, interval)
+		next = start
 
-		for now.Compare(next) >= 0 {
-			next = start.AddDate(0, 0, interval)
+		if now.Day() > next.Day() {
+			for now.Compare(next) >= 0 {
+				next = next.AddDate(0, 0, interval)
+			}
 		}
 
 		return next.Format("20060102"), nil
@@ -79,6 +84,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 
 	case "m":
 		rule := strings.Split(repeat, " ")
+		fmt.Println("next") // test
 
 		// create a monthday rule slice
 		month := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"}
@@ -106,14 +112,17 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 				}
 
 				// итерации по календарю месяца
-				for !ruleDaysClndr[next.Day()] { // если нет очередного дня или месяца
+				for !ruleDaysClndr[next.Day()] {
+					fmt.Println("plus") // test
 					next = next.AddDate(0, 0, 1)
 				}
 
 				// найденная дата до текущей даты?
-				if now.Before(next) {
+				if now.Day() < next.Day() {
+					fmt.Println(next.Day())
 					return next.Format("20060102"), nil
 				}
+				// fmt.Println("next") // test
 
 			} else {
 				next = next.AddDate(0, 0, 1)
@@ -121,8 +130,8 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		}
 
 	}
-	return "", errors.New("invalid character of repeat mod")
 
+	return "", errors.New("invalid character of repeat mod")
 }
 
 func calendarMonthDay(nextDate time.Time, rule []string) (map[int]bool, error) {

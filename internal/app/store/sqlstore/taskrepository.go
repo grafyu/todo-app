@@ -4,7 +4,7 @@ package sqlstore
 
 import (
 	"database/sql"
-	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/grafyu/todo-app/internal/app/store"
@@ -18,6 +18,7 @@ type TaskRepository struct {
 
 // Create Task...
 func (r TaskRepository) Create(t *model.Task) error {
+
 	if err := t.Validate(); err != nil {
 		return err
 	}
@@ -37,8 +38,10 @@ func (r TaskRepository) Create(t *model.Task) error {
 
 // View Tasks...
 func (r TaskRepository) View() ([]model.Task, error) {
-	var tasks []model.Task
-	tsk := &model.Task{}
+	var (
+		tasks []model.Task
+		tsk   model.Task
+	)
 
 	rows, err := r.store.db.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date LIMIT 25")
 	if err != nil {
@@ -48,7 +51,6 @@ func (r TaskRepository) View() ([]model.Task, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-
 		err := rows.Scan(
 			&tsk.ID,
 			&tsk.Date,
@@ -60,19 +62,21 @@ func (r TaskRepository) View() ([]model.Task, error) {
 			return nil, err
 		}
 
-		tasks = append(tasks, *tsk)
+		tasks = append(tasks, tsk)
 
 		if err := rows.Err(); err != nil {
 			return nil, err
 		}
 
 	}
+
 	return tasks, nil
 }
 
 // FindByDate - найти Task по дате,
-func (r TaskRepository) FindByDate(date string) (*model.Task, error) {
-	tsk := &model.Task{}
+func (r TaskRepository) FindByDate(date string) (model.Task, error) {
+	tsk := model.Task{}
+
 	if err := r.store.db.QueryRow(
 		"SELECT id, date, title, comment, repeat FROM scheduler WHERE date = :date",
 		sql.Named("date", date),
@@ -84,16 +88,15 @@ func (r TaskRepository) FindByDate(date string) (*model.Task, error) {
 		&tsk.Repeat,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, store.ErrRecondNotFound
+			return model.Task{}, store.ErrRecondNotFound
 		}
-
-		return nil, err
 	}
 
 	return tsk, nil
 }
 
-func (r TaskRepository) ChangeTask(t *model.Task) error {
+func (r TaskRepository) ChangeTask(t model.Task) error {
+
 	if err := t.Validate(); err != nil {
 		return err
 	}
@@ -101,6 +104,8 @@ func (r TaskRepository) ChangeTask(t *model.Task) error {
 	if err := t.BeforeCreate(); err != nil {
 		return err
 	}
+
+	fmt.Printf("NextDate для перезаписи ПОСЛЕ это - %v\n", t.Date)
 
 	_, err := r.store.db.Exec("UPDATE scheduler SET date = :date, title = :title, comment = :comment, repeat = :repeat WHERE id = :id",
 		sql.Named("date", t.Date),
@@ -127,8 +132,8 @@ func (r TaskRepository) DeleteByID(id string) error {
 }
 
 // FindByDate - найти Task по дате,
-func (r TaskRepository) FindByID(id int) (*model.Task, error) {
-	tsk := &model.Task{}
+func (r TaskRepository) FindByID(id int) (model.Task, error) {
+	tsk := model.Task{}
 
 	if err := r.store.db.QueryRow(
 		"SELECT id, date, title, comment, repeat FROM scheduler WHERE id = :id",
@@ -141,7 +146,7 @@ func (r TaskRepository) FindByID(id int) (*model.Task, error) {
 		&tsk.Repeat,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errors.New("задача не haha найдена")
+			return model.Task{}, err
 		}
 	}
 
